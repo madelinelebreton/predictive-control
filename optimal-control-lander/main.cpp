@@ -1,25 +1,21 @@
 // main.cpp
-// implements a finite horizon LQR to control a lander system
+// implements a finite horizon LQR to control a lander system using code from fall.cpp
+// to compile: g++ -std=c++17 -I/usr/local/opt/eigen/include/eigen3 main.cpp kalman.cpp DARE.cpp -o lander
+// written by Madeline LeBreton with code from MVM
 
 #include <iostream>
 #include <vector>
 #include <Eigen/Dense>
 #include <random>
 #include <cstdio> // for gnuplot
-
-
 #include "kalman.h" // for state estimates
 #include "DARE.h" // controller
 
-
 #define P_SIGMA_H  0.01
 #define P_SIGMA_G 0.1
-
 #define M_SIGMA 1.
 
-
 double g,hight,v,t;
-
 double dt;
 
 // from fall.cpp
@@ -28,22 +24,16 @@ void fall_init(double x0, double gravity)
 	g=gravity;
         hight= x0;
         v=0;
-
 }
-
 
 // falling with noise injected and control input u
 double falling(double noise_p,double noise_g,double u)
 {
-
   hight=hight+dt*v + dt*noise_p;
   v=v-dt*(g+noise_g)+dt*u;
 
   return(hight);
-
 }
-
-
 
 // PLOT with gnuplot
 void plot(void)
@@ -60,30 +50,24 @@ void plot(void)
   pclose(gp);
 }
 
-
 int main(int argc, char* argv[]) {
 
   int n = 3; // Number of states
   int m = 1; // Number of measurements
 
-  // SOME NOISE
-  std::default_random_engine generator;
+  std::default_random_engine generator;   // SOME NOISE
   std::normal_distribution<double> p_noise_h(0.0,P_SIGMA_H*P_SIGMA_H);
   std::normal_distribution<double> p_noise_g(0.0,P_SIGMA_G*P_SIGMA_G);
   std::normal_distribution<double> m_noise(0.0,M_SIGMA*M_SIGMA);
-
 
   dt = 1.0/30; // Time step
 
   Eigen::MatrixXd A(n, n); // System dynamics matrix
   Eigen::MatrixXd B(n, m); // Output matrix /// NOT USED IN JUST FALLING
-
   Eigen::MatrixXd C(m, n); // Output matrix
   Eigen::MatrixXd Q(n, n); // Process noise covariance
   Eigen::MatrixXd R(m, m); // Measurement noise covariance
   Eigen::MatrixXd P(n, n); // Estimate error covariance
-
-
 
   A << 1.,dt,0,  0,1,dt,  0,0,1;
   B << 0.,dt,0;   // thrust changes the velocity: v += dt*u 
@@ -93,7 +77,6 @@ int main(int argc, char* argv[]) {
   // Reasonable covariance matrices
   Q <<P_SIGMA_H*P_SIGMA_H  ,0.,0, 0,0,0, 0,0,P_SIGMA_G*P_SIGMA_G ;
   R << M_SIGMA*M_SIGMA;
-
   P <<  1,0,0,  0,1,0, 0,0,1;
 
   std::cout << "A: \n" << A << std::endl;
@@ -102,18 +85,13 @@ int main(int argc, char* argv[]) {
   std::cout << "R: \n" << R << std::endl;
   std::cout << "P: \n" << P << std::endl;
 
-
   KalmanFilter kf(dt,A,B, C, Q, R, P);
 
-
   Eigen::VectorXd x0(n);
-  // third is initial guess of gravity
-  x0 << 110,0,0;
-  //x0 << 100,0,2; ///  WOrks even with wrong sign
+  x0 << 110,0,0;   // third is initial guess of gravity
   kf.init(dt,x0);
 
   // CONTROLLER (finite-horizon LQR) same A and B as KF.
-  // thrust is cheap (small Rc), so the controller can brake hard enough
   int horizon = 450; // long enough to watch system converge 
   Eigen::MatrixXd Qc(n, n); // state cost
   Eigen::MatrixXd Rc(1, 1);   // control cost
@@ -124,17 +102,13 @@ int main(int argc, char* argv[]) {
   DARE contr(A, B, Qc, Rc, horizon);
 
   contr.init();
-
   fall_init(100,5.5); // real plant conditions
-
   FILE* log;
   log=fopen("DATA","w");
-
 
   double t = 0;
   int num=100;
   Eigen::VectorXd y(m);
-
 
   y << falling(0.,0.,0.);
 
@@ -142,7 +116,6 @@ int main(int argc, char* argv[]) {
   int i = 0; // step number, picks the gain K_i
 
   // from fall.cpp
-  //printf("%f\t %f\t%f\t%f\t%f \n",t, y(0),  kf.state()[0],kf.state()[1],kf.state()[2]);
   fprintf(log,"%f\t %f\t%f\t%f\t%f\t%f\t%f\t%f \n",t, y(0),  kf.state()[0],kf.state()[1],kf.state()[2],
           hight, v, u); // using true h, v and u
 
@@ -155,7 +128,6 @@ int main(int argc, char* argv[]) {
     if (u < 0) u = 0;  // limit the lander to only brake (not truly optimal)
     i++;
 
-    //printf("%f\t %f\t%f\t%f\t%f \n",t, y(0),  kf.state()[0],kf.state()[1],kf.state()[2]);
     fprintf(log,"%f\t %f\t%f\t%f\t%f\t%f\t%f\t%f \n",t, y(0),  kf.state()[0],kf.state()[1],kf.state()[2],
             hight, v, u);                             
     y << falling(p_noise_h(generator),p_noise_g(generator),u); 
@@ -166,6 +138,5 @@ int main(int argc, char* argv[]) {
   std::cout << "Touchdown: t= " << t << "  h= " << hight << "  v= " << v
             << "  g_est= " << -kf.state()[2] << std::endl;
   plot();
-
   return 0;
 }

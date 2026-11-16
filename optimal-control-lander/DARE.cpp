@@ -1,5 +1,10 @@
+// DARE.cpp
 // Ricatti equation implementation (DARE)
 // MvM April 2019 for teaching
+
+// Discrete-time Algebraic Ricatti Equation, recursion backwards in time
+// finite horizon LQR (optimal state feedback) to choose braking at each step
+// controller for lander. gives optimal K[0] K[1]... for control u=-Kx
 
 #include <iostream>
 #include <stdexcept>
@@ -7,7 +12,7 @@
 #include "DARE.h"
 
 
-
+// Q and R are weighting matrices for state and control effort
 DARE::DARE(
     const Eigen::MatrixXd& A,
     const Eigen::MatrixXd& B,
@@ -46,6 +51,7 @@ void DARE::init(void)
         K_array[N-1]=  Eigen::MatrixXd(1,state_n);
         S_array[N-1]=  Eigen::MatrixXd(state_n,state_n);
 
+	// cost to go is the terminal penalty
 	K_array[N-1].setIdentity();
         S_array[N-1].setIdentity();
 	
@@ -54,9 +60,10 @@ void DARE::init(void)
 		K_array[i]= Eigen::MatrixXd(state_n,1);
 		S_array[i]=Eigen::MatrixXd(state_n,state_n);
 
+		// compute optimal gain for step i
 		K_array[i] = (R+ B.transpose() * S_array[i+1] *B ).inverse()  *
 				  B.transpose()* S_array[i+1]* A;
-
+		// new cost-to-go, state and control cost + future cost
  		S_array[i]= Q+  K_array[i].transpose() *R * K_array[i] +	
 			      (A-B*K_array[i]).transpose()*S_array[i+1]*(A-B*K_array[i]);
 	}

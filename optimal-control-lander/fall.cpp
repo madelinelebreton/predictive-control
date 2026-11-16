@@ -9,12 +9,13 @@
 
 #include "kalman.h"
 
-#define P_SIGMA_H  0.01
-#define P_SIGMA_G 0.1
+#define P_SIGMA_H  0.01 // process noise for height
+#define P_SIGMA_G 0.1 // process noise for gravity
 
-#define M_SIGMA 1.
+#define M_SIGMA 1. // measurement noise for height
 
 
+// PLANT: the real simulation
 double g,hight,v,t;
 
 double dt;
@@ -34,9 +35,9 @@ double falling(double noise_p,double noise_g,double u)
 {
 
   hight=hight+dt*v + dt*noise_p;
-  v=v-dt*(g+noise_g)+dt*u;
+  v=v-dt*(g+noise_g)+dt*u; // u is thrust (acceleration UP)
   
-  return(hight);
+  return(hight); // returns new height 
 
 }
 
@@ -51,7 +52,7 @@ int main(int argc, char* argv[]) {
 
   // SOME NOISE
   std::default_random_engine generator;
-  std::normal_distribution<double> p_noise_h(0.0,P_SIGMA_H*P_SIGMA_H);
+  std::normal_distribution<double> p_noise_h(0.0,P_SIGMA_H*P_SIGMA_H); // squared for variance
   std::normal_distribution<double> p_noise_g(0.0,P_SIGMA_G*P_SIGMA_G);
   std::normal_distribution<double> m_noise(0.0,M_SIGMA*M_SIGMA);
 
@@ -68,15 +69,22 @@ int main(int argc, char* argv[]) {
 
 
 
-  A << 1.,dt,0,  0,1,dt,  0,0,1;
+  A << 1.,dt,0,  
+       0,1,dt,  
+       0,0,1;
  
   C << 1,0,0;
 
   // Reasonable covariance matrices
-  Q <<P_SIGMA_H*P_SIGMA_H  ,0.,0, 0,0,0, 0,0,P_SIGMA_G*P_SIGMA_G ;
+  // [height; speed; gravity]
+  Q <<P_SIGMA_H*P_SIGMA_H  ,0.,0, 
+      0,                    0, 0, 
+      0,                    0, P_SIGMA_G*P_SIGMA_G ;
   R << M_SIGMA*M_SIGMA;
 
   P <<  1,0,0,  0,1,0, 0,0,1;
+
+  B << 0, dt, 0;
 
   std::cout << "A: \n" << A << std::endl;
   std::cout << "C: \n" << C << std::endl;
